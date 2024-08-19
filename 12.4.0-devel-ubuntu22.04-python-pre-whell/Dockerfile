@@ -1,0 +1,47 @@
+ARG CUDA_IMAGE="12.4.0-devel-ubuntu22.04"
+FROM nvidia/cuda:${CUDA_IMAGE}
+
+ENV SERVER_DIR=/var/lib/llama
+RUN mkdir -p $SERVER_DIR
+
+# Core dependencies linux
+RUN apt update && \
+    apt upgrade -y && \
+    apt install -y \
+        python3 \
+        python3-pip \
+        build-essential \
+        gcc \
+        wget \
+        git \
+        && \
+    python3 -m pip install --upgrade pip
+
+# Accellerator specific dependencies linux
+RUN apt install -y \
+        ocl-icd-opencl-dev \
+        opencl-headers \
+        clinfo \
+        libclblast-dev \
+        libopenblas-dev \
+        && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /etc/OpenCL/vendors && echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
+
+# Install depencencies python
+COPY requirements-deps.txt $SERVER_DIR
+RUN pip3 install -r $SERVER_DIR/requirements-deps.txt
+
+# Install llama-cpp-python (build with cuda)
+COPY requirements.txt $SERVER_DIR
+ENV CUDA_DOCKER_ARCH=all
+ENV GGML_CUDA=1
+RUN CMAKE_ARGS="-DGGML_CUDA=on" pip3 install -r $SERVER_DIR/requirements.txt --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
+
+# Set environment variable for the host
+ENV HOST=0.0.0.0
+ENV PORT=8000
+
+EXPOSE ${PORT}
+# ENTRYPOINT [ "python3", "-m", "llama_cpp.server", "--n_gpu_layers", "-1"]
