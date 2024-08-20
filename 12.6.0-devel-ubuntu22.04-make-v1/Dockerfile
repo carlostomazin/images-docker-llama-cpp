@@ -1,6 +1,5 @@
-ARG UBUNTU_VERSION=22.04
-ARG CUDA_VERSION=12.4.0
-FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${UBUNTU_VERSION}
+ARG CUDA_IMAGE="12.6.0-devel-ubuntu22.04"
+FROM nvidia/cuda:${CUDA_IMAGE}
 
 # Core dependencies linux
 RUN apt update && \
@@ -9,8 +8,10 @@ RUN apt update && \
         python3 \
         python3-pip \
         build-essential \
+        gcc \
+        wget \
         git && \
-    pip3 install --upgrade pip
+    python3 -m pip install --upgrade pip
 
 # Accellerator specific dependencies linux
 RUN apt install -y \
@@ -29,7 +30,8 @@ ENV CUDA_DOCKER_ARCH=all
 # Enable CUDA
 ENV GGML_CUDA=1
 
-# Install llama-cpp-python (build with cuda)
-RUN CMAKE_ARGS="-DGGML_CUDA=on" pip3 install llama_cpp_python[server] --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
+RUN git clone https://github.com/ggerganov/llama.cpp
+WORKDIR llama.cpp
+RUN make -j$(nproc) llama-server
 
 EXPOSE 8080
